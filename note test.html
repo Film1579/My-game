@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Cinematic Letter with Music Player</title>
+    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css'>
+    <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --env-color: #FFE5EC;
+            --env-dark: #FFB3C6;
+            --env-right-side: #FFC2D1;
+            --env-left-side: #FFC2D1;
+            --env-flap: #FFC2D1;
+            --paper-color: #ffffff;
+            --bezier: cubic-bezier(0.22, 1, 0.36, 1);
+
+            /* --- ส่วนที่ปรับแต่งฟอนต์ให้เชื่อมกับขนาดกระดาษ --- */
+            --heading-font: 'Mali', cursive;
+            --body-font: 'Mali', cursive;
+            --heading-size: 8cqw;   /* ปรับตามความกว้างกระดาษ */
+            --body-size: 4.5cqw;    /* ปรับตามความกว้างกระดาษ */
+            --back-text-size: 5cqw; /* ปรับตามความกว้างกระดาษ */
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            background-color: #fceef5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: var(--body-font);
+            overflow: hidden;
+        }
+
+        /* Falling hearts */
+        .hearts-container {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .falling-heart {
+            position: absolute;
+            top: -60px;
+            opacity: 0;
+            animation: fallHeart linear infinite;
+            user-select: none;
+        }
+
+        @keyframes fallHeart {
+            0%   { transform: translateY(0) rotate(var(--rot-start)); opacity: 0; }
+            8%   { opacity: var(--max-opacity); }
+            90%  { opacity: var(--max-opacity); }
+            100% { transform: translateY(112vh) rotate(var(--rot-end)); opacity: 0; }
+        }
+
+        /* Container */
+        .container {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        /* Floating shadow beneath envelope */
+        .env-shadow {
+            position: absolute;
+            bottom: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 230px;
+            height: 32px;
+            background: radial-gradient(ellipse at center, rgba(180,60,100,0.25) 0%, transparent 72%);
+            border-radius: 50%;
+            animation: shadowFloat 3.8s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes shadowFloat {
+            0%, 100% { width: 230px; opacity: 1; }
+            50%       { width: 200px; opacity: 0.65; }
+        }
+
+        /* Envelope */
+        .envelope {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: var(--env-color);
+            z-index: 2;
+            transition: opacity 0.8s var(--bezier), filter 0.8s var(--bezier);
+            box-shadow:
+                0 12px 35px rgba(200,60,100,0.14),
+                0 5px 14px rgba(0,0,0,0.07);
+            animation: floatEnv 3.8s ease-in-out infinite;
+        }
+
+        @keyframes floatEnv {
+            0%, 100% { transform: translateY(0px); }
+            50%       { transform: translateY(-9px); }
+        }
+
+        .envelope.opening { animation: none !important; }
+
+        .envelope::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 70%, rgba(0,0,0,0.07), transparent 75%);
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        .flap {
+            position: absolute;
+            top: 0;
+            width: 0; height: 0;
+            border-left: 150px solid transparent;
+            border-right: 150px solid transparent;
+            border-top: 120px solid var(--env-flap);
+            transform-origin: top;
+            transition: transform 0.7s var(--bezier);
+            z-index: 9;
+            filter: drop-shadow(0 8px 5px rgba(0,0,0,0.10));
+        }
+
+        .env-left {
+            position: absolute;
+            left: 0; top: 0;
+            border-top: 100px solid transparent;
+            border-bottom: 100px solid transparent;
+            border-left: 150px solid var(--env-left-side);
+            z-index: 6;
+            filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.07));
+        }
+
+        .env-right {
+            position: absolute;
+            right: 0; top: 0;
+            border-top: 100px solid transparent;
+            border-bottom: 100px solid transparent;
+            border-right: 150px solid var(--env-right-side);
+            z-index: 6;
+            filter: drop-shadow(-2px 4px 3px rgba(0,0,0,0.07));
+        }
+
+        .env-bottom {
+            position: absolute;
+            bottom: 0; left: 0;
+            border-left: 150px solid transparent;
+            border-right: 150px solid transparent;
+            border-bottom: 100px solid var(--env-dark);
+            z-index: 5;
+        }
+
+        /* Paper */
+        #paper {
+            position: absolute;
+            left: 50%;
+            bottom: 10px;
+            transform: translateX(-50%) scaleY(0.05);
+            transform-origin: bottom center;
+            width: 260px;
+            height: 150px;
+            background: transparent; 
+            padding: 0;
+            z-index: 4;
+            overflow: visible; 
+            border-radius: 2px;
+            transition: all 0.9s var(--bezier);
+            perspective: 1500px; 
+            /* กำหนด container เพื่อใช้ cqw */
+            container-type: inline-size;
+        }
+
+        /* Backdrop */
+        .backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(252, 238, 245, 0.65);
+            backdrop-filter: blur(8px);
+            z-index: 98;
+        }
+
+        /* Paper inner — perspective container for flip */
+        #paper-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d; 
+            transition: transform 0.95s var(--bezier);
+        }
+
+        .paper-page {
+            position: absolute;
+            inset: 0;
+            background: #ffffff;
+            /* เพิ่ม padding ด้านล่างให้มากขึ้นเพื่อกันเนื้อหาทับกับปุ่ม flip */
+            padding: 8% 7% 60px 7%; 
+            backface-visibility: hidden; 
+            -webkit-backface-visibility: hidden;
+            overflow: hidden; 
+            border-radius: 6px;
+            box-shadow: 0 10px 30px rgba(200,80,120,0.15), 0 4px 12px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .page-front {
+            z-index: 2;
+            transform: rotateY(0deg);
+        }
+
+        .page-back {
+            z-index: 1;
+            transform: rotateY(180deg); 
+            background: linear-gradient(140deg, #fff5f8 0%, #fffafc 100%);
+            text-align: center;
+        }
+
+        #paper-inner.flipped {
+            transform: rotateY(180deg);
+        }
+
+        /* Content Styles */
+        .heading {
+            font-family: var(--heading-font);
+            font-size: var(--heading-size);
+            color: #c8506a;
+            margin: 0 0 4% 0;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .message-body {
+            font-family: var(--body-font);
+            font-size: var(--body-size);
+            line-height: 1.6;
+            color: #444;
+            white-space: pre-line;
+            text-align: center;
+            margin-bottom: 5%;
+        }
+
+        .content-img {
+            width: 100%;
+            max-width: 80%;
+            border-radius: 0px;
+            margin: 3% 0;
+            box-shadow: 0 0px 0px rgba(0,0,0,0.1);
+        }
+
+        .page-back-content {
+            color: #c8506a;
+            font-size: var(--back-text-size);
+            line-height: 1.8;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .big-heart {
+            font-size: 15cqw;
+            display: block;
+            margin-bottom: -2%;
+            animation: heartbeat 1.4s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            14%  { transform: scale(1.2); }
+            28%  { transform: scale(1); }
+            42%  { transform: scale(1.12); }
+        }
+
+        /* UI Elements */
+        .close-btn {
+            position: absolute;
+            top: 15px; 
+            right: 15px; 
+            width: 28px;
+            height: 28px;
+            background: rgba(255,190,210,0.22);
+            border: 1.5px solid rgba(255,128,160,0.35);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 110; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255,128,160,0.28);
+            transform: scale(1.1) rotate(90deg);
+        }
+
+        .close-btn svg { width: 12px; height: 12px; stroke: #c8506a; stroke-width: 2.5; fill: none; }
+
+        .flip-btn {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background: transparent;
+            color: #444;
+            border: none;
+            padding: 5px;
+            border-radius: 0;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            box-shadow: none;
+            transition: opacity 0.2s;
+            z-index: 110; 
+        }
+
+        .flip-btn:hover { opacity: 0.7; transform: none; }
+
+        .confetti { position: fixed; z-index: 200; pointer-events: none; border-radius: 2px; }
+
+        @keyframes scatter {
+            0%   { transform: translate(0,0) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; }
+        }
+
+        .click-hint {
+            position: absolute;
+            bottom: -36px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #e07090;
+            font-size: 0.76rem;
+            white-space: nowrap;
+            animation: hintBlink 2.2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes hintBlink { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+        /* --- Music Player Styles --- */
+        .music-container {
+            background-color: #fff;
+            border-radius: 15px;
+            box-shadow: 0 3px 10px 0 rgba(186, 184, 184, 0.3);
+            display: flex;
+            padding: 10px 20px;
+            position: relative;
+            margin: 40px 0;
+            z-index: 10;
+            width: 100%;
+            align-items: center;
+        }
+
+        .img-container {
+            position: relative;
+            width: 60px;
+        }
+
+        .img-container img {
+            border-radius: 50%;
+            object-fit: cover;
+            height: 60px;
+            width: inherit;
+            animation: rotateImage 3s linear infinite;
+            animation-play-state: paused;
+        }
+
+        .img-container::after {
+            content: '';
+            position: absolute;
+            background-color: #fff;
+            border-radius: 50%;
+            top: 44%;
+            left: 50%;
+            height: 25px;
+            width: 25px;
+            transform: translate(-50%, -50%);
+        }
+
+        .music-container.play .img-container img {
+            animation-play-state: running;
+        }
+
+        @keyframes rotateImage {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .navigation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            margin-left: 10px;
+        }
+
+        .action-btn {
+            background-color: transparent;
+            border: 0;
+            color: #c8506a;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 8px;
+            margin: 0 5px;
+        }
+
+        .action-btn:focus { outline: none; }
+
+        .action-btn.action-btn-big { font-size: 24px; }
+
+        .music-info {
+            background-color: rgba(255,255,255,0.8);
+            border-radius: 10px 10px 0 0;
+            position: absolute;
+            width: calc(100% - 40px);
+            padding: 5px 10px 5px 70px;
+            top: 0;
+            left: 20px;
+            opacity: 0;
+            transform: translateY(0%);
+            transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+            z-index: 0;
+        }
+
+        .music-container.play .music-info {
+            opacity: 1;
+            transform: translateY(-80%);
+        }
+
+        .music-info h2 {
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin: 0;
+            color: #c8506a;
+        }
+
+        .progress-container {
+            background-color: #eee;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px 0;
+            height: 4px;
+            width: 100%;
+        }
+
+        .progress {
+            background-color: #fe8daa;
+            border-radius: 5px;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body>
+
+<div class="hearts-container" id="heartsContainer"></div>
+<div class="backdrop" id="backdrop"></div>
+
+<div class="container" id="mainContainer" onclick="startAnimation()">
+    <div class="env-shadow"></div>
+    <div class="envelope" id="envelope">
+        <div class="flap" id="flap"></div>
+        <div class="env-left"></div>
+        <div class="env-right"></div>
+        <div class="env-bottom"></div>
+        <div id="paper">
+            <div id="paper-inner">
+                <div class="paper-page page-front" id="pageFront">
+                    <div class="heading">Happy Birthday! 🎂</div>
+                    <div class="message-body">ขอให้วันเกิดปีนี้มีแต่ความสุข ความทรงจำดี ๆ และให้ทุกความฝันของเธอค่อย ๆ กลายเป็นจริงนะ
+                    
+                    I’m really happy I get to spend part of your birthday with you, but it’s a little sad that I can’t stay with you tonight. ❤️</div>
+                    <img src="https://media.tenor.com/son5fV636DsAAAAi/happy-birthday-birthday.gif" alt="Front Image" class="content-img">
+                </div>
+
+                <div class="paper-page page-back" id="pageBack">
+                    <div class="page-back-content">
+                        <span class="big-heart">💌</span>
+                        ดีใจที่วันนั้นมีเธออยู่ข้าง ๆ<br>
+                        ขอบคุณที่อยู่ข้างกันเสมอมา
+                        
+                        <img src="https://cdn.jsdelivr.net/gh/Film1579/Sound-1@main/IMG_20260402_201944.png" class="content-img">
+
+                        <div class="music-container" id="music-container">
+                            <div class="music-info">
+                                <h2 id="title" class="title"></h2>
+                                <div class="progress-container" id="progress-container">
+                                    <div class="progress" id="progress"></div>
+                                </div>
+                            </div>
+                            <audio src="https://raw.githubusercontent.com/Film1579/Sound-1/main/This%20Time%20-%20Jeff%20Bernat%20(128k).mp3" id="audio"></audio>
+                            <div class="img-container">
+                                <img src="https://raw.githubusercontent.com/Film1579/Sound-1/main/300.jpeg" alt="music-cover" id="cover" />
+                            </div>
+                            <div class="navigation">
+                                <button id="prev" class="action-btn"><i class="fas fa-backward"></i></button>
+                                <button id="play" class="action-btn action-btn-big"><i class="fas fa-play"></i></button>
+                                <button id="next" class="action-btn"><i class="fas fa-forward"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="click-hint" id="clickHint">✉ มีคนส่งจดหมายถึงคุณ</div>
+</div>
+
+<script>
+    let played    = false;
+    let paperFixed= false;
+    let isFlipped = false;
+    const BEZIER  = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    
+    // ตั้งค่าตัวแปรเพลงให้พร้อมใช้งาน
+    const musicUrl = 'https://raw.githubusercontent.com/Film1579/Sound-1/main/This%20Time%20-%20Jeff%20Bernat%20(128k).mp3';
+
+    // Music Player Variables
+    let musicInited = false;
+    const songs = ["This Time – Jeff Bernat"]; 
+    let songIndex = 0;
+
+    (function spawnHearts() {
+        const container = document.getElementById('heartsContainer');
+        const emojis    = ['❤️','🩷','💕','💗','💓','💞','🌸','✨'];
+        for (let i = 0; i < 20; i++) {
+            const h = document.createElement('div');
+            h.className   = 'falling-heart';
+            h.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            const dur        = 6 + Math.random() * 9;
+            const delay      = Math.random() * 12;
+            const rotStart   = (Math.random() - 0.5) * 40;
+            const rotEnd     = rotStart + (Math.random() - 0.5) * 130;
+            const maxOpacity = 0.22 + Math.random() * 0.32;
+            h.style.left     = (Math.random() * 100) + '%';
+            h.style.fontSize = (1.0 + Math.random() * 1.3) + 'rem';
+            h.style.setProperty('--rot-start',   rotStart   + 'deg');
+            h.style.setProperty('--rot-end',     rotEnd     + 'deg');
+            h.style.setProperty('--max-opacity', maxOpacity);
+            h.style.animationDuration = dur   + 's';
+            h.style.animationDelay    = delay + 's';
+            container.appendChild(h);
+        }
+    })();
+
+    function createConfetti() {
+        for (let i = 0; i < 55; i++) {
+            const p = document.createElement('div');
+            p.className = 'confetti';
+            p.style.background = `hsl(${Math.random()*40+320},100%,78%)`;
+            const sz = Math.random() * 10 + 5;
+            p.style.width  = sz + 'px';
+            p.style.height = (sz * 0.55) + 'px';
+            p.style.setProperty('--x', ((Math.random()-0.5)*700)+'px');
+            p.style.setProperty('--y', ((Math.random()-0.5)*700)+'px');
+            p.style.setProperty('--r', (Math.random()*1080)+'deg');
+            p.style.left           = '50vw';
+            p.style.top            = '45vh';
+            p.style.animationDelay = (Math.random()*200)+'ms';
+            p.style.animation      = `scatter 1.6s ${BEZIER} forwards`;
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1900);
+        }
+    }
+
+    function flipPage(e) {
+        if (e) e.stopPropagation();
+        const inner = document.getElementById('paper-inner');
+        if (!inner) return;
+        isFlipped = !isFlipped;
+        inner.classList.toggle('flipped', isFlipped);
+    }
+
+    function closePaper(e) {
+        if (e) e.stopPropagation();
+        if (!paperFixed) return;
+
+        // Stop music if playing when closing
+        const audio = document.getElementById("audio");
+        const musicContainer = document.getElementById("music-container");
+        if(audio) audio.pause();
+        if(musicContainer) musicContainer.classList.remove("play");
+
+        const paper    = document.getElementById('paper');
+        const envelope = document.getElementById('envelope');
+        const backdrop = document.getElementById('backdrop');
+        const flap     = document.getElementById('flap');
+        const container= document.getElementById('mainContainer');
+
+        const envRect = envelope.getBoundingClientRect();
+
+        paper.style.transition = 'all 0.85s ' + BEZIER;
+        const midW = 260, midH = 100;
+        paper.style.left         = (envRect.left + (envRect.width - midW) / 2) + 'px';
+        paper.style.top          = (envRect.top  - 90) + 'px';
+        paper.style.width        = midW + 'px';
+        paper.style.height       = midH + 'px';
+        paper.style.borderRadius = '2px';
+        
+        envelope.style.opacity = '1';
+        envelope.style.filter  = 'blur(0px)';
+        backdrop.style.display = 'none';
+
+        setTimeout(() => {
+            envelope.appendChild(paper);
+            paper.style.transition = 'none';
+            paper.style.position   = 'absolute';
+            paper.style.left       = '50%';
+            paper.style.top        = 'auto';
+            paper.style.bottom     = '10px';
+            paper.style.width      = '260px';
+            paper.style.height     = '150px';
+            paper.style.transform  = 'translateX(-50%) translateY(-55%) scaleY(0.85)';
+            paper.style.zIndex     = '4';
+            paper.style.overflow   = 'hidden';
+
+            paper.getBoundingClientRect(); 
+
+            setTimeout(() => {
+                paper.style.transition = `transform 0.65s ${BEZIER}`;
+                paper.style.transform  = 'translateX(-50%) scaleY(0.05)';
+
+                setTimeout(() => {
+                    flap.style.transition = `transform 0.6s ${BEZIER}`;
+                    flap.style.transform  = 'rotateX(0deg)';
+                    flap.style.zIndex     = '9';
+                    envelope.classList.remove('opening');
+
+                    setTimeout(() => {
+                        paperFixed = false;
+                        played     = false;
+                        isFlipped  = false;
+                        const inner  = document.getElementById('paper-inner');
+                        if (inner)  inner.classList.remove('flipped');
+                        paper.querySelectorAll('.close-btn, .flip-btn').forEach(el => el.remove());
+                        const hint = document.getElementById('clickHint');
+                        if (hint) hint.style.display = 'block';
+                        container.style.pointerEvents = 'auto';
+                        paper.removeEventListener('click', flipPage);
+                    }, 700);
+                }, 380);
+            }, 60);
+        }, 880);
+    }
+
+    function addButtonsToPage(pageElement, flipText) {
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-btn';
+        closeBtn.innerHTML = `<svg viewBox="0 0 14 14"><line x1="2" y1="2" x2="12" y2="12"/><line x1="12" y1="2" x2="2" y2="12"/></svg>`;
+        closeBtn.addEventListener('click', closePaper);
+        pageElement.appendChild(closeBtn);
+
+        const flipBtn = document.createElement('button');
+        flipBtn.className = 'flip-btn';
+        flipBtn.textContent = flipText;
+        flipBtn.addEventListener('click', flipPage);
+        pageElement.appendChild(flipBtn);
+    }
+
+    // ฟังก์ชันเล่นเพลง
+    function playSong() {
+        const musicContainer = document.getElementById("music-container");
+        const playButton = document.getElementById("play");
+        const audio = document.getElementById("audio");
+        musicContainer.classList.add("play");
+        playButton.querySelector("i.fas").classList.remove("fa-play");
+        playButton.querySelector("i.fas").classList.add("fa-pause");
+        audio.play().catch(e => console.log("Audio play failed", e));
+    }
+
+    function pauseSong() {
+        const musicContainer = document.getElementById("music-container");
+        const playButton = document.getElementById("play");
+        const audio = document.getElementById("audio");
+        musicContainer.classList.remove("play");
+        playButton.querySelector("i.fas").classList.remove("fa-pause");
+        playButton.querySelector("i.fas").classList.add("fa-play");
+        audio.pause();
+    }
+
+    function initMusicPlayer() {
+        if(musicInited) return;
+        
+        const musicContainer = document.getElementById("music-container");
+        const playButton = document.getElementById("play");
+        const prevButton = document.getElementById("prev");
+        const nextButton = document.getElementById("next");
+        const audio = document.getElementById("audio");
+        audio.volume = 0.2; 
+        const progress = document.getElementById("progress");
+        const progressContainer = document.getElementById("progress-container");
+        const title = document.getElementById("title");
+        const cover = document.getElementById("cover");
+
+        function getSongTitle(song) {
+            return song.charAt(0).toUpperCase() + song.slice(1);
+        }
+
+        function loadSong(song) {
+            title.innerText = getSongTitle(song);
+            audio.src = musicUrl;
+            cover.src = `https://raw.githubusercontent.com/Film1579/Sound-1/main/300.jpeg`;
+        }
+
+        playButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isPlaying = musicContainer.classList.contains("play");
+            isPlaying ? pauseSong() : playSong();
+        });
+
+        prevButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            loadSong(songs[0]);
+            playSong();
+        });
+
+        nextButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            loadSong(songs[0]);
+            playSong();
+        });
+
+        audio.addEventListener("timeupdate", (e) => {
+            const { duration, currentTime } = e.srcElement;
+            const progressPercent = (currentTime / duration) * 100;
+            progress.style.width = `${progressPercent}%`;
+        });
+
+        progressContainer.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const width = progressContainer.clientWidth;
+            const clickX = e.offsetX;
+            const duration = audio.duration;
+            audio.currentTime = (clickX / width) * duration;
+        });
+
+        audio.addEventListener("ended", () => {
+            playSong(); 
+        });
+
+        loadSong(songs[0]);
+        musicInited = true;
+    }
+
+    function startAnimation() {
+        if (played) return;
+        played = true;
+
+        const paper    = document.getElementById('paper');
+        const flap     = document.getElementById('flap');
+        const envelope = document.getElementById('envelope');
+        const backdrop = document.getElementById('backdrop');
+        const hint     = document.getElementById('clickHint');
+        const pageFront= document.getElementById('pageFront');
+        const pageBack = document.getElementById('pageBack');
+
+        if (hint) hint.style.display = 'none';
+        envelope.classList.add('opening');
+
+        // เอา openSound.play() ออกเพื่อป้องกันเพลงเล่นซ้อนกัน
+        flap.style.transition = `transform 0.7s ${BEZIER}`;
+        flap.style.transform  = 'rotateX(180deg)';
+        flap.style.zIndex     = '1';
+        
+        // เริ่มโหลดเครื่องเล่นเพลงและสั่งเล่นอัตโนมัติ
+        initMusicPlayer();
+        setTimeout(playSong, 500); 
+
+        setTimeout(createConfetti, 400);
+
+        setTimeout(() => {
+            paper.style.transition = `transform 0.85s ${BEZIER}`;
+            paper.style.transform  = 'translateX(-50%) translateY(-120%) scaleY(1)';
+        }, 900);
+
+        setTimeout(() => {
+            const rect = paper.getBoundingClientRect();
+            paper.style.transition = 'none';
+            paper.style.position   = 'fixed';
+            paper.style.left       = rect.left + 'px';
+            paper.style.top        = rect.top  + 'px';
+            paper.style.bottom     = 'auto';
+            paper.style.transform  = 'none';
+            paper.style.width      = rect.width  + 'px';
+            paper.style.height     = rect.height + 'px';
+            paper.style.zIndex     = '100';
+
+            document.body.appendChild(paper);
+            paperFixed = true;
+
+            backdrop.style.display = 'block';
+            envelope.style.opacity = '0.3';
+            envelope.style.filter  = 'blur(4px)';
+
+            // ปรับความสูง (th) ให้ยืดหยุ่นและสูงขึ้นเพื่อป้องกันปุ่มทับเนื้อหา
+            const tw = Math.min(window.innerWidth  * 0.88, 420);
+            const th = Math.min(window.innerHeight * 0.82, 620); 
+            const tl = (window.innerWidth  - tw) / 2;
+            const tt = (window.innerHeight - th) / 2;
+
+            paper.style.transition = 'all 0.9s ' + BEZIER;
+            paper.style.left         = tl + 'px';
+            paper.style.top          = tt + 'px';
+            paper.style.width        = tw + 'px';
+            paper.style.height       = th + 'px';
+            paper.style.borderRadius = '10px';
+            paper.style.overflow     = 'visible';
+
+            addButtonsToPage(pageFront, 'มีต่อ');
+            addButtonsToPage(pageBack, 'ย้อนกลับ');
+            
+            paper.addEventListener('click', flipPage);
+        }, 2000);
+    }
+</script>
+</body>
+</html>
